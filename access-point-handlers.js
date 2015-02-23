@@ -43,6 +43,7 @@ httpDelHandler = function httpDelHandler(ref) {
   }
 */
 var requestRange = function(req, fileSize) {
+  console.log("wouhou");
   if (req) {
     if (req.headers) {
       var rangeString = req.headers.range;
@@ -57,18 +58,16 @@ var requestRange = function(req, fileSize) {
         // Make sure parts consists of two strings and range is of type "byte"
         if (parts.length == 2 && unit == 'bytes') {
           // Parse the range
-          var range = parts[1].split('-');
-          var start = Number(range[0]);
-          var end = Number(range[1]);
+          var end, parts, start;
 
-          // Fix invalid ranges?
-          if (range[0] != start) start = 0;
-          if (range[1] != end) end = fileSize - 1;
+          parts = req.headers["range"].replace(/bytes=/, "").split("-");
+          start = parseInt(parts[0], 10);
+          end = (parts[1] ? parseInt(parts[1], 10) : fileSize - 1);
 
           // Make sure range consists of a start and end point of numbers and start is less than end
           if (start < end) {
 
-            var partSize = start + end + 1;
+            var partSize = (end - start) + 1
 
             // Return the parsed range
             return {
@@ -77,7 +76,7 @@ var requestRange = function(req, fileSize) {
               length: partSize,
               size: fileSize,
               unit: unit,
-              partial: (partSize < fileSize)
+              partial: true
             };
 
           } else {
@@ -163,13 +162,13 @@ httpGetHandler = function httpGetHandler(ref) {
   // Get the contents range from request
   var range = requestRange(self.request, copyInfo.size);
 
-  // Some browsers cope better if the content-range header is
-  // still included even for the full file being returned.
-  self.addHeader('Content-Range', range.unit + ' ' + range.start + '-' + range.end + '/' + range.size);
-
   // If a chunk/range was requested instead of the whole file, serve that'
+  // Also set correct headers for partial request
   if (range.partial) {
+    // Inform clients that we accept ranges for resumable chunked downloads
     self.setStatusCode(206, 'Partial Content');
+    self.addHeader('Accept-Ranges', range.unit);
+    self.addHeader('Content-Range', range.unit + ' ' + range.start + '-' + range.end + '/' + range.size);
   } else {
     self.setStatusCode(200, 'OK');
   }
@@ -184,9 +183,6 @@ httpGetHandler = function httpGetHandler(ref) {
 
   // Last modified header (updatedAt from file info)
   self.addHeader('Last-Modified', copyInfo.updatedAt.toUTCString());
-
-  // Inform clients that we accept ranges for resumable chunked downloads
-  self.addHeader('Accept-Ranges', range.unit);
 
   if (FS.debug) console.log('Read file "' + (ref.filename || copyInfo.name) + '" ' + range.unit + ' ' + range.start + '-' + range.end + '/' + range.size);
 

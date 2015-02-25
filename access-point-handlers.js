@@ -43,7 +43,6 @@ httpDelHandler = function httpDelHandler(ref) {
   }
 */
 var requestRange = function(req, fileSize) {
-  console.log("wouhou");
   if (req) {
     if (req.headers) {
       var rangeString = req.headers.range;
